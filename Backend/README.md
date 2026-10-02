@@ -118,3 +118,66 @@ Returned when an unexpected server error occurs while processing the request.
 - Passwords are hashed before saving to the database.
 - A JWT token is generated for the registered user and returned in the response.
 - The route is defined as `POST /users/register`.
+
+---
+
+## User Login API
+
+### Endpoint
+
+`POST /users/login`
+
+Authenticates an existing user with their email and password. On success, the endpoint returns a JWT token and the user data.
+
+### Request Body
+
+```json
+{
+  "email": "john@example.com",
+  "password": "123456"
+}
+```
+
+### Validation Rules
+
+- `email` must be a valid email address.
+- `password` must contain at least 6 characters.
+
+### Success Response
+
+#### Status Code: `200 OK`
+
+```json
+{
+  "token": "<jwt-token>",
+  "user": {
+    "_id": "67c4c56a-bb34-471a-b57a-f60a877b4824",
+    "fullname": {
+      "firstname": "John",
+      "lastname": "Doe"
+    },
+    "email": "john@example.com"
+  }
+}
+```
+
+### Error Responses
+
+#### `400 Bad Request`
+
+Returned when request validation fails. The response includes an `errors` array describing the invalid fields.
+
+#### `401 Unauthorized`
+
+Returned when the email is not found or the password does not match:
+
+```json
+{
+  "message": "Invalid email or password"
+}
+```
+
+### Notes
+
+- Passwords are checked against the stored password hash.
+- The route is defined as `POST /users/login`.
