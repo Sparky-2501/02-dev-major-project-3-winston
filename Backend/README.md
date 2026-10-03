@@ -181,3 +181,102 @@ Returned when the email is not found or the password does not match:
 
 - Passwords are checked against the stored password hash.
 - The route is defined as `POST /users/login`.
+
+## User Profile API
+
+### Endpoint
+
+`GET /users/profile`
+
+Returns the authenticated user's profile.
+
+### Authentication
+
+Send the JWT in the `token` cookie or as a bearer token:
+
+```http
+Authorization: Bearer <jwt-token>
+```
+
+### Success Response
+
+#### Status Code: `200 OK`
+
+```json
+{
+  "user": {
+    "_id": "67c4c56a-bb34-471a-b57a-f60a877b4824",
+    "fullname": {
+      "firstname": "John",
+      "lastname": "Doe"
+    },
+    "email": "john@example.com"
+  }
+}
+```
+
+### Error Response
+
+#### `401 Unauthorized`
+
+Returned when the token is missing or invalid:
+
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+An invalid or expired token returns:
+
+```json
+{
+  "message": "Invalid token"
+}
+```
+
+## User Logout API
+
+### Endpoint
+
+`GET /users/logout`
+
+The user routes are mounted at `/users`, so the registered logout path is `/users/logout` (not `/user/logout`).
+
+### Authentication
+
+Requires a JWT in the `token` cookie or as a bearer token:
+
+```http
+Authorization: Bearer <jwt-token>
+```
+
+### Success Response
+
+#### Status Code: `200 OK`
+
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+The endpoint clears the `token` cookie. Tokens sent using the cookie are also added to the blacklist.
+
+### Error Response
+
+#### `401 Unauthorized`
+
+Returned when the token is missing or invalid:
+
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+### Implementation Notes
+
+- The JWT contains the user ID in the `_id` claim, while the authentication middleware currently looks up `decoded.id`. As a result, the profile response may contain `"user": null` until those claim names are aligned.
+- The middleware currently checks the user collection rather than the blacklist collection, so adding a token to the blacklist does not currently make subsequent requests reject it.
+- The logout controller currently reads the cookie reliably; its bearer-token fallback uses the wrong request property, so bearer-token clients should discard their token locally.
