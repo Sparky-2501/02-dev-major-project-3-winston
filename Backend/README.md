@@ -280,3 +280,79 @@ Returned when the token is missing or invalid:
 - The JWT contains the user ID in the `_id` claim, while the authentication middleware currently looks up `decoded.id`. As a result, the profile response may contain `"user": null` until those claim names are aligned.
 - The middleware currently checks the user collection rather than the blacklist collection, so adding a token to the blacklist does not currently make subsequent requests reject it.
 - The logout controller currently reads the cookie reliably; its bearer-token fallback uses the wrong request property, so bearer-token clients should discard their token locally.
+
+## Captain Registration API
+
+### Endpoint
+
+`POST /captains/register`
+
+Registers a captain with their name, email, password, and vehicle details. The captain routes are mounted at `/captains`.
+
+### Request Body
+
+Send a JSON object with this shape:
+
+```json
+{
+  "fullname": {
+    "firstname": "Alex",
+    "lastname": "Rider"
+  },
+  "email": "alex@example.com",
+  "password": "example-password",
+  "vehicle": {
+    "color": "Blue",
+    "plate": "ABC123",
+    "capacity": 4,
+    "vehicleType": "car"
+  }
+}
+```
+
+### Validation Rules
+
+- `fullname.firstname` is required and must contain at least 3 characters.
+- `fullname.lastname` is optional; if provided, it must contain at least 3 characters.
+- `email` must be a valid email address.
+- `password` must contain at least 6 characters.
+- `vehicle.color` is required and must contain at least 3 characters.
+- `vehicle.plate` is optional; if provided, it must contain at least 3 characters.
+- `vehicle.capacity` is required and must be an integer of at least 1.
+- `vehicle.vehicleType` is required and must be `car`, `auto`, or `motorcycle`.
+
+### Error Responses
+
+#### `400 Bad Request`
+
+Validation failures return an `errors` array:
+
+```json
+{
+  "errors": [
+    {
+      "msg": "Invalid email address",
+      "path": "email",
+      "location": "body"
+    }
+  ]
+}
+```
+
+The controller also returns this response when its email lookup finds an existing captain:
+
+```json
+{
+  "message": "Captain already exists"
+}
+```
+
+### Implementation Status
+
+The route and its request validation are defined, but registration is not currently complete:
+
+- The controller imports `../services/captain.service`, which is not present in the repository.
+- After creating a captain and generating a token, the controller does not send a response.
+- The controller passes name and password fields that do not match the captain model's `fullname` and `password` schema.
+
+As a result, a successful registration response cannot currently be documented as an available API behavior. Complete and test the controller and service before relying on this endpoint.
