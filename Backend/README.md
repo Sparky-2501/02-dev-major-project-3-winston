@@ -281,17 +281,17 @@ Returned when the token is missing or invalid:
 - The middleware currently checks the user collection rather than the blacklist collection, so adding a token to the blacklist does not currently make subsequent requests reject it.
 - The logout controller currently reads the cookie reliably; its bearer-token fallback uses the wrong request property, so bearer-token clients should discard their token locally.
 
-## Captain Registration API
+## Captain APIs
 
-### Endpoint
+Captain routes are mounted under `/captains`. The router defines registration and login endpoints, and protected profile and logout endpoints. Protected routes accept a JWT from the `token` cookie or the `Authorization: Bearer <token>` header.
+
+### Register Captain
 
 `POST /captains/register`
 
-Registers a captain with their name, email, password, and vehicle details. The captain routes are mounted at `/captains`.
+Registers a captain with personal and vehicle details.
 
-### Request Body
-
-Send a JSON object with this shape:
+#### Request body
 
 ```json
 {
@@ -303,56 +303,86 @@ Send a JSON object with this shape:
   "password": "example-password",
   "vehicle": {
     "color": "Blue",
-    "plate": "ABC123",
+    "plate": "MH 00 AB 6123",
     "capacity": 4,
     "vehicleType": "car"
   }
 }
 ```
 
-### Validation Rules
+#### Validation
 
 - `fullname.firstname` is required and must contain at least 3 characters.
 - `fullname.lastname` is optional; if provided, it must contain at least 3 characters.
 - `email` must be a valid email address.
 - `password` must contain at least 6 characters.
 - `vehicle.color` is required and must contain at least 3 characters.
-- `vehicle.plate` is optional; if provided, it must contain at least 3 characters.
+- `vehicle.plate` is optional in route validation; if provided, it must contain at least 3 characters.
 - `vehicle.capacity` is required and must be an integer of at least 1.
 - `vehicle.vehicleType` is required and must be `car`, `auto`, or `motorcycle`.
 
-### Error Responses
+#### Responses
 
-#### `400 Bad Request`
+Validation failures return `400 Bad Request` with an `errors` array. The controller is also written to return `400 Bad Request` with `{"message":"Captain already exists"}` when its email lookup finds a duplicate.
 
-Validation failures return an `errors` array:
+There is currently no reliable success response: the controller calls service methods that are not exported by `captain.service.js`, does not pass the vehicle fields expected by `createCaptain`, and does not send a response after generating a token. The service requires a plate even though route validation marks it optional.
 
-```json
-{
-  "errors": [
-    {
-      "msg": "Invalid email address",
-      "path": "email",
-      "location": "body"
-    }
-  ]
-}
-```
+### Captain Login
 
-The controller also returns this response when its email lookup finds an existing captain:
+`POST /captains/login`
+
+Authenticates a captain with an email and password.
+
+#### Request body
 
 ```json
 {
-  "message": "Captain already exists"
+  "email": "alex@example.com",
+  "password": "example-password"
 }
 ```
 
-### Implementation Status
+#### Validation
 
-The route and its request validation are defined, but registration is not currently complete:
+- `email` must be a valid email address.
+- `password` must not be empty.
 
-- The controller imports `../services/captain.service`, which is not present in the repository.
-- After creating a captain and generating a token, the controller does not send a response.
-- The controller passes name and password fields that do not match the captain model's `fullname` and `password` schema.
+#### Responses
 
-As a result, a successful registration response cannot currently be documented as an available API behavior. Complete and test the controller and service before relying on this endpoint.
+- Validation failures return `400 Bad Request` with an `errors` array.
+- If no captain is found, the controller returns `400 Bad Request` with `{"message":"Invalid email or password"}`.
+- The intended success body is `{"token":"<jwt-token>"}`.
+
+The current success path is incomplete: the controller requests a `hashedPassword` field, while the model stores the selected-out hash in `password`; it also calls service methods that are not exported. In addition, the password-match result is not checked before token generation. Do not rely on login until these issues are fixed.
+
+### Captain Profile
+
+`GET /captains/profile`
+
+The route is intended to require captain authentication and return the captain document (the example shows only its ID):
+
+```json
+{
+  "captain": {
+    "_id": "<captain-id>"
+  }
+}
+```
+
+Supply the JWT as a `token` cookie or in the `Authorization` header using the `Bearer` scheme.
+
+The auth middleware returns `401 Unauthorized` when no token is supplied, when the token is blacklisted, or when token verification fails. However, the captain model signs tokens with an `_id` claim, while the middleware looks up `decoded.id`, so a verified token may resolve to a null captain.
+
+### Captain Logout
+
+`POST /captains/logout`
+
+Requires captain authentication. The controller attempts to add the supplied cookie or bearer token to the token blacklist, clears the `token` cookie, and returns:
+
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+**Current status:** The controller passes the token directly to `blackListTokenModel.create`, so logout may not create a valid blacklist record depending on the blacklist model schema. The authentication middleware checks the blacklist before allowing protected requests; verify logout and token rejection against the actual model before relying on revocation.
